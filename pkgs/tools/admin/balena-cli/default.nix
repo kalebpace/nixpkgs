@@ -1,6 +1,8 @@
 { lib
 , stdenv
 , fetchzip
+, testers
+, callPackage
 }:
 
 let
@@ -28,15 +30,28 @@ let
     inherit sha256;
   };
 in
-stdenv.mkDerivation rec {
+stdenv.mkDerivation (finalAttrs: {
   pname = "balena-cli";
   inherit version src;
 
   installPhase = ''
+    runHook preInstall
+
     mkdir -p $out/bin
     cp -r ./* $out/
     ln -s $out/balena $out/bin/balena
+
+    runHook postInstall
   '';
+
+  passthru.tests.version = testers.testVersion {
+    package = finalAttrs.finalPackage;
+    command = ''
+      # Override default cache directory so Balena CLI's unavoidable update check does not fail due to write permissions
+      BALENARC_DATA_DIRECTORY=./ balena --version
+    '';
+    inherit version;
+  };
 
   # https://github.com/NixOS/nixpkgs/pull/48193/files#diff-b65952dbe5271c002fbc941b01c3586bf5050ad0e6aa6b2fcc74357680e103ea
   preFixup =
@@ -94,4 +109,4 @@ stdenv.mkDerivation rec {
     sourceProvenance = [ sourceTypes.binaryNativeCode ];
     mainProgram = "balena";
   };
-}
+})
